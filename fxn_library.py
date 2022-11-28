@@ -55,6 +55,33 @@ def kl_divergence(p, q):
     return kl_div
 
 
+# Mutual information function I(X; Y)
+# FIXME: ADD OPTION FOR MARGINALS TO NOT BE SPECIFIED (WOULD BE CALCULATED IN FUNCTION)
+# Inputs
+# p - total joint distribution (as dataframe)
+# m1 - marginal distribution of X
+# m2 - marginal distribution of Y
+# var_lst - list of variable names (as specified in dataframe)
+def mutual_info(p, m1, m2, var_lst):
+    v1 = var_lst[0]
+    v2 = var_lst[1]
+
+    mi = 0
+    for i in range(p.shape[0]):
+        # Collect the necessary probabilities
+        p_x = m1.loc[m1[v1].squeeze() == p[v1].squeeze()[i]]['p'].values[0][0]
+        p_y = m2.loc[m2[v2].squeeze() == p[v2].squeeze()[i]]['p'].values[0][0]
+        p_xy = p['p'].squeeze()[i]
+
+        # NaN protection
+        if p_x < zero_threshold or p_y < zero_threshold or p_xy < zero_threshold:
+            continue
+
+        mi += p_xy * np.log2(p_xy / (p_x * p_y))
+
+    return mi
+
+
 # Generic conditional mutual information for I(X;Y|Z)
 # Inputs:
 # p - total joint distribution
@@ -104,11 +131,6 @@ def build_a_mat(p, var_lst):
 
 # FIXME: GENERALIZE FOR DIFFERENT SIZED NULL SPACES
 def compute_unique_info(pmf_df, null, var_lst, res_lower, res_upper, delta_q=0.01, verbose=False, get_metadata=False):
-    # Define variables for loop meta data
-    cmi_arr = []
-    kl_arr = []
-    uim = UI_Metadata(pmf_df)
-
     # Collect the relevant variables
     t = var_lst[0]
     s1 = var_lst[1]
@@ -119,8 +141,18 @@ def compute_unique_info(pmf_df, null, var_lst, res_lower, res_upper, delta_q=0.0
     # One-variable marginal (absolutely constrained)
     m_1 = compute_marginal(pmf_df, [s2])
 
-    for a in np.arange(res_lower.x[0], res_upper.x[0], delta_q):
-        for b in np.arange(res_lower.x[1], res_upper.x[1], delta_q):
+    range1 = np.arange(res_lower.x[0], res_upper.x[0], delta_q)
+    range2 = np.arange(res_lower.x[1], res_upper.x[1], delta_q)
+
+    # Define variables for loop meta data
+    cmi_arr = []
+    kl_arr = []
+    mi_arr = np.zeros((len(range1)*len(range2), 3))  # Compute the 3 mutual info quantities
+    arr_idx = 0  # Index for tracking meta data array positions
+    uim = UI_Metadata(pmf_df)
+
+    for a in range1:
+        for b in range2:
             # Define Q distribution
             q = a * null[:, 0] + b * null[:, 1] + np.transpose(pmf)
             q = np.hstack((events, np.transpose(q)))
@@ -138,17 +170,29 @@ def compute_unique_info(pmf_df, null, var_lst, res_lower, res_upper, delta_q=0.0
             kl_div = kl_divergence(pmf_df['p'].to_numpy(), q['p'].to_numpy())
             kl_arr.append(kl_div)
 
+            # Compute I(X;Z), I(Y;Z)
+            # FIXME: DON'T HARDCODE THE VARIABLES
+            mx = compute_marginal(pmf_df, [t])
+            my = compute_marginal(pmf_df, [s1])
+            mz = compute_marginal(pmf_df, [s2])
+            mxy = compute_marginal(q, [t, s1])
+            mi_arr[arr_idx, 0] = mutual_info(mxy, mx, my, [t, s1])
+            mi_arr[arr_idx, 1] = mutual_info(m_2a, mx, mz, [t, s2])
+            mi_arr[arr_idx, 2] = mutual_info(m_2b, my, mz, [s1, s2])
+
             # Determine distributions of smallest and largest CMI
             if get_metadata:
                 if uim.max_cmi < cmi:
-                    uim.update_max(q, cmi, kl_div)
+                    uim.update_max(q, cmi, kl_div, mi_arr[arr_idx, 2])  # FIXME: OUTPUT ANOTHER COLUMN OF MI_ARR (NOT 2)
                 if uim.min_cmi > cmi:
-                    uim.update_min(q, cmi, kl_div)
+                    uim.update_min(q, cmi, kl_div, mi_arr[arr_idx, 2])  # FIXME: OUTPUT ANOTHER COLUMN OF MI_ARR (NOT 2)
+
+            arr_idx += 1
 
         if verbose:
             print(a)
 
-    return cmi_arr, kl_arr, uim
+    return cmi_arr, kl_arr, mi_arr, uim
 
 
 # ########################################### CLASSES ###########################################
@@ -167,12 +211,17 @@ class UI_Metadata:
         self.min_kl = 0
         self.max_kl = 0
 
-    def update_max(self, q, cmi, kl):
+        self.min_mi = 0
+        self.max_mi = 0
+
+    def update_max(self, q, cmi, kl, mi):
         self.max_q = q
         self.max_cmi = cmi
         self.max_kl = kl
+        self.max_mi = mi
 
-    def update_min(self, q, cmi, kl):
+    def update_min(self, q, cmi, kl, mi):
         self.min_q = q
         self.min_cmi = cmi
         self.min_kl = kl
+        self.min_mi = mi

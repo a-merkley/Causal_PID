@@ -5,6 +5,7 @@ from scipy.linalg import null_space
 from scipy.optimize import linprog
 from matplotlib import pyplot as plt
 import fxn_library as fxn
+import csv
 
 
 # Define P over 3 variables
@@ -14,23 +15,25 @@ events = np.array([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1],
 # pmf = np.transpose(np.array([8*[0.125]]))  # Uniform distribution example
 pmf = np.transpose(np.array([[0.1, 0.1, 0.1, 0.05, 0.05, 0.1, 0.2, 0.3]]))  # A canonical random example
 
-# Generate 100 random pmfs
-for j in range(100):
+min_cmi_arr = []
+min_kl_arr = []
+min_mi_arr = []
+
+for p_idx in range(10):
     pmf = fxn.generate_random_pmf(8)  # Some random example
-    pmf = np.transpose(np.array([[0.1, 0.1, 0.1, 0.05, 0.05, 0.1, 0.2, 0.3]]))  # A canonical random example #FIXME: RMEOVE
 
     # Convert to dataframe
     pmf_stk = np.hstack((events, pmf))
     pmf_df = pd.DataFrame(data=pmf_stk, columns=["X", "Y", "Z", "p"])
 
-    # FIXME: REMOVE LATER
-    print('\n\n')
-    print(pmf_df)
+    print(pmf_df)  # FIXME: REMOVE IF NOT ITERATING OVER RANDOM PMFS
 
-    # Compare UI(X; Y\Z) to UI(Y; X\Z)
-    ui_order = [["X", "Y", "Z"], ["Y", "X", "Z"]]
+    # Compare UI(Y; X\Z) to UI(X; Y\Z)
+    ui_order = [["Y", "X", "Z"], ["X", "Y", "Z"]]
 
     for i in range(len(ui_order)):
+        print("Unique information for ", ui_order[i])
+
         # Select UI target and sources: UI(t; s1 \ s2)
         t = ui_order[i][0]
         s1 = ui_order[i][1]
@@ -55,22 +58,48 @@ for j in range(100):
         res_lower = linprog(c_lower, A_ub=mat, b_ub=pmf, bounds=[(None, 0), (None, 0)])  # Min coef for positive prob
 
         # Compute unique information
-        cmi_arr, kl_arr, uim = fxn.compute_unique_info(pmf_df, null, [t, s1, s2], res_lower, res_upper, delta_q=0.01,
+        cmi_arr, kl_arr, mi_arr, uim = fxn.compute_unique_info(pmf_df, null, [t, s1, s2], res_lower, res_upper, delta_q=0.01,
                                                        verbose=False, get_metadata=True)
 
-        # FIXME: COMPUTE I(X;Z), I(Y;Z)
-
         # Output unique information
-        print("*** UI = ", uim.min_cmi)
+        print("*** UI = ", uim.min_cmi, uim.min_kl, uim.min_mi)
         print(uim.min_q)
 
-        # Plotting
-        plt.scatter(kl_arr, cmi_arr, marker=".")
-        plt.xlabel("KL divergence")
-        plt.ylabel("I(" + t + "; " + s1 + " | " + s2 + ")")
-        plt.title("UI(" + t + "; " + s1 + " \\ " + s2 + ")")
-        plt.show()
+        min_cmi_arr.append(uim.min_cmi)
+        min_kl_arr.append(uim.min_kl)
+        min_mi_arr.append(uim.min_mi)
 
-    print("Stop")
+    # Plotting
+    # # 3D plotting
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection='3d')
+    # ax.scatter(kl_arr, mi_arr[:, 2], cmi_arr)
+    # ax.set_xlabel("KL div")
+    # ax.set_ylabel("Mutual info")
+    # ax.set_zlabel("CMI")
+    # plt.show()
+    # # Normal plotting
+    # plt.subplot(2, 1, i+1)
+    # plt.scatter(mi_arr[:, 2], cmi_arr, marker=".")
+    # plt.xlabel("KL divergence")
+    # plt.ylabel("I(" + t + "; " + s1 + " | " + s2 + ")")
+    # plt.title("UI(" + t + "; " + s1 + " \\ " + s2 + ")")
+# plt.show()
+
+# File for CMI
+with open('cmi.csv', 'w') as myfile:
+    wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+    wr.writerow(min_cmi_arr)
+myfile.close()
+# File for MI
+with open('mi.csv', 'w') as myfile:
+    wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+    wr.writerow(min_mi_arr)
+myfile.close()
+# File for KL
+with open('kl.csv', 'w') as myfile:
+    wr = csv.writer(myfile)#, quoting=csv.QUOTE_ALL)
+    wr.writerow(min_kl_arr)
+myfile.close()
 
 print("Placeholder")
