@@ -19,11 +19,11 @@ def compute_marginal(joint, var_lst):
     if vals.ndim == 1:
         vals = np.expand_dims(vals, axis=1)
 
-    marginal = pd.DataFrame(np.hstack((vals, np.expand_dims(prob, axis=1))))
+    marginal_arr = np.hstack((vals, np.expand_dims(prob, axis=1)))
 
     # Name the columns
     var_lst.append('p')
-    marginal.columns = [var_lst]
+    marginal = pd.DataFrame(marginal_arr, columns=var_lst)
 
     return marginal
 
@@ -69,8 +69,8 @@ def mutual_info(p, m1, m2, var_lst):
     mi = 0
     for i in range(p.shape[0]):
         # Collect the necessary probabilities
-        p_x = m1.loc[m1[v1].squeeze() == p[v1].squeeze()[i]]['p'].values[0][0]
-        p_y = m2.loc[m2[v2].squeeze() == p[v2].squeeze()[i]]['p'].values[0][0]
+        p_x = m1.loc[m1[v1].squeeze() == p[v1].squeeze()[i]]['p'].values[0]
+        p_y = m2.loc[m2[v2].squeeze() == p[v2].squeeze()[i]]['p'].values[0]
         p_xy = p['p'].squeeze()[i]
 
         # NaN protection
@@ -98,11 +98,11 @@ def conditional_mutual_info(p, m0, m1, m2, var_lst):
     for i in range(p.shape[0]):
         # Collect the necessary probabilities
         p_xyz = p['p'][i]
-        p_z = m0.loc[m0[v0].squeeze() == p[v0][i]]['p'].values[0][0]
+        p_z = m0.loc[m0[v0].squeeze() == p[v0][i]]['p'].values[0]
         yz_val = p[[v0, v1]].iloc[i]
-        p_xz = m1.loc[(m1[v0].squeeze() == yz_val[0]) & (m1[v1].squeeze() == yz_val[1])]['p'].values[0][0]
+        p_xz = m1.loc[(m1[v0].squeeze() == yz_val[0]) & (m1[v1].squeeze() == yz_val[1])]['p'].values[0]
         xy_val = p[[v2, v0]].iloc[i]
-        p_yz = m2.loc[(m2[v2].squeeze() == xy_val[0]) & (m2[v0].squeeze() == xy_val[1])]['p'].values[0][0]
+        p_yz = m2.loc[(m2[v2].squeeze() == xy_val[0]) & (m2[v0].squeeze() == xy_val[1])]['p'].values[0]
 
         # NaN protection
         if p_z < zero_threshold or p_xyz < zero_threshold or p_xz < zero_threshold or p_yz < zero_threshold:

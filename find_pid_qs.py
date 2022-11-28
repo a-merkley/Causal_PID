@@ -19,7 +19,7 @@ min_cmi_arr = []
 min_kl_arr = []
 min_mi_arr = []
 
-for p_idx in range(10):
+for p_idx in range(100):
     pmf = fxn.generate_random_pmf(8)  # Some random example
 
     # Convert to dataframe
@@ -28,12 +28,10 @@ for p_idx in range(10):
 
     print(pmf_df)  # FIXME: REMOVE IF NOT ITERATING OVER RANDOM PMFS
 
-    # Compare UI(Y; X\Z) to UI(X; Y\Z)
-    ui_order = [["Y", "X", "Z"], ["X", "Y", "Z"]]
+    # Compare UI(X; Y\Z) to UI(Y; X\Z)
+    ui_order = [["X", "Y", "Z"], ["Y", "X", "Z"]]
 
     for i in range(len(ui_order)):
-        print("Unique information for ", ui_order[i])
-
         # Select UI target and sources: UI(t; s1 \ s2)
         t = ui_order[i][0]
         s1 = ui_order[i][1]
@@ -85,6 +83,12 @@ for p_idx in range(10):
     # plt.ylabel("I(" + t + "; " + s1 + " | " + s2 + ")")
     # plt.title("UI(" + t + "; " + s1 + " \\ " + s2 + ")")
 # plt.show()
+        # # Plotting
+        # plt.scatter(kl_arr, cmi_arr, marker=".")
+        # plt.xlabel("KL divergence")
+        # plt.ylabel("I(" + t + "; " + s1 + " | " + s2 + ")")
+        # plt.title("UI(" + t + "; " + s1 + " \\ " + s2 + ")")
+        # plt.show()
 
 # File for CMI
 with open('cmi.csv', 'w') as myfile:
