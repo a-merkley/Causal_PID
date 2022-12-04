@@ -84,25 +84,25 @@ def mutual_info(p, m1, m2, var_lst):
 
 # Generic conditional mutual information for I(X;Y|Z)
 # Inputs:
-# p - total joint distribution
+# p - total joint distribution as a dataframe
 # m0 - one variable marginal distribution
 # m1 - pairwise marginal 1
 # m2 - pairwise marginal 2
-# var_lst - list of variable names. 1st one is var to condition on (1-var marginal), remaining are pairs
+# var_lst - list of variable names. v0 is target conditioning on (1-var marginal), remaining are pairs
 def conditional_mutual_info(p, m0, m1, m2, var_lst):
-    v0 = var_lst[0]
-    v1 = var_lst[1]
-    v2 = var_lst[2]
+    v0 = var_lst[0]  # Z
+    v1 = var_lst[1]  # X
+    v2 = var_lst[2]  # Y
 
     cond_mi = 0
     for i in range(p.shape[0]):
         # Collect the necessary probabilities
         p_xyz = p['p'][i]
         p_z = m0.loc[m0[v0].squeeze() == p[v0][i]]['p'].values[0][0]
-        yz_val = p[[v0, v1]].iloc[i]
-        p_xz = m1.loc[(m1[v0].squeeze() == yz_val[0]) & (m1[v1].squeeze() == yz_val[1])]['p'].values[0][0]
-        xy_val = p[[v2, v0]].iloc[i]
-        p_yz = m2.loc[(m2[v2].squeeze() == xy_val[0]) & (m2[v0].squeeze() == xy_val[1])]['p'].values[0][0]
+        xz_val = p[[v0, v1]].iloc[i]
+        p_xz = m1.loc[(m1[v0].squeeze() == xz_val[0]) & (m1[v1].squeeze() == xz_val[1])]['p'].values[0][0]
+        yz_val = p[[v2, v0]].iloc[i]
+        p_yz = m2.loc[(m2[v2].squeeze() == yz_val[0]) & (m2[v0].squeeze() == yz_val[1])]['p'].values[0][0]
 
         # NaN protection
         if p_z < zero_threshold or p_xyz < zero_threshold or p_xz < zero_threshold or p_yz < zero_threshold:
@@ -147,7 +147,7 @@ def compute_unique_info(pmf_df, null, var_lst, res_lower, res_upper, delta_q=0.0
     # Define variables for loop meta data
     cmi_arr = []
     kl_arr = []
-    mi_arr = np.zeros((len(range1)*len(range2), 3))  # Compute the 3 mutual info quantities
+    mi_arr = np.zeros(len(range1)*len(range2))  # Compute MI between srcs (the marginals that aren't fixed)
     arr_idx = 0  # Index for tracking meta data array positions
     uim = UI_Metadata(pmf_df)
 
@@ -171,21 +171,17 @@ def compute_unique_info(pmf_df, null, var_lst, res_lower, res_upper, delta_q=0.0
             kl_arr.append(kl_div)
 
             # Compute I(X;Z), I(Y;Z)
-            # FIXME: DON'T HARDCODE THE VARIABLES
             mx = compute_marginal(pmf_df, [t])
             my = compute_marginal(pmf_df, [s1])
             mz = compute_marginal(pmf_df, [s2])
-            mxy = compute_marginal(q, [t, s1])
-            mi_arr[arr_idx, 0] = mutual_info(mxy, mx, my, [t, s1])
-            mi_arr[arr_idx, 1] = mutual_info(m_2a, mx, mz, [t, s2])
-            mi_arr[arr_idx, 2] = mutual_info(m_2b, my, mz, [s1, s2])
+            mi_arr[arr_idx] = mutual_info(m_2b, my, mz, [s1, s2])  # Mutual information between sources (under Q)
 
             # Determine distributions of smallest and largest CMI
             if get_metadata:
                 if uim.max_cmi < cmi:
-                    uim.update_max(q, cmi, kl_div, mi_arr[arr_idx, 2])  # FIXME: OUTPUT ANOTHER COLUMN OF MI_ARR (NOT 2)
+                    uim.update_max(q, cmi, kl_div, mi_arr[arr_idx])
                 if uim.min_cmi > cmi:
-                    uim.update_min(q, cmi, kl_div, mi_arr[arr_idx, 2])  # FIXME: OUTPUT ANOTHER COLUMN OF MI_ARR (NOT 2)
+                    uim.update_min(q, cmi, kl_div, mi_arr[arr_idx])
 
             arr_idx += 1
 

@@ -19,7 +19,7 @@ min_cmi_arr = []
 min_kl_arr = []
 min_mi_arr = []
 
-for p_idx in range(10):
+for p_idx in range(1):
     pmf = fxn.generate_random_pmf(8)  # Some random example
 
     # Convert to dataframe
@@ -30,6 +30,16 @@ for p_idx in range(10):
 
     # Compare UI(Y; X\Z) to UI(X; Y\Z)
     ui_order = [["Y", "X", "Z"], ["X", "Y", "Z"]]
+
+    # # Get metrics from original distribution P
+    # s2 = "Z"
+    # t = "Y"
+    # s1 = "X"
+    # m0 = fxn.compute_marginal(pmf_df, [s2])
+    # m1 = fxn.compute_marginal(pmf_df, [t, s2])
+    # m2 = fxn.compute_marginal(pmf_df, [s2, s1])
+    # # I(target; src1 | src2)
+    # cond_mi_orig = fxn.conditional_mutual_info(pmf_df, m0, m1, m2, [s2, t, s1])
 
     for i in range(len(ui_order)):
         print("Unique information for ", ui_order[i])
@@ -58,7 +68,7 @@ for p_idx in range(10):
         res_lower = linprog(c_lower, A_ub=mat, b_ub=pmf, bounds=[(None, 0), (None, 0)])  # Min coef for positive prob
 
         # Compute unique information
-        cmi_arr, kl_arr, mi_arr, uim = fxn.compute_unique_info(pmf_df, null, [t, s1, s2], res_lower, res_upper, delta_q=0.01,
+        cmi_arr, kl_arr, mi_arr, uim = fxn.compute_unique_info(pmf_df, null, [t, s1, s2], res_lower, res_upper, delta_q=0.05,
                                                        verbose=False, get_metadata=True)
 
         # Output unique information
@@ -69,6 +79,22 @@ for p_idx in range(10):
         min_kl_arr.append(uim.min_kl)
         min_mi_arr.append(uim.min_mi)
 
+        mi_arr_2 = mi_arr
+
+        # Get metrics from original distribution P
+        m0 = fxn.compute_marginal(pmf_df, [s2])
+        m1 = fxn.compute_marginal(pmf_df, [t, s2])
+        m2 = fxn.compute_marginal(pmf_df, [s2, s1])
+        # I(target; src1 | src2)
+        cond_mi_orig = fxn.conditional_mutual_info(pmf_df, m0, m1, m2, [s2, t, s1])
+
+        # Normal plotting
+        plt.scatter(mi_arr, cmi_arr, marker=".")
+        plt.xlabel("KL divergence")
+        plt.ylabel("I(" + t + "; " + s1 + " | " + s2 + ")")
+        plt.title("UI(" + t + "; " + s1 + " \\ " + s2 + ")")
+        plt.show()
+
     # Plotting
     # # 3D plotting
     # fig = plt.figure()
@@ -78,13 +104,6 @@ for p_idx in range(10):
     # ax.set_ylabel("Mutual info")
     # ax.set_zlabel("CMI")
     # plt.show()
-    # # Normal plotting
-    # plt.subplot(2, 1, i+1)
-    # plt.scatter(mi_arr[:, 2], cmi_arr, marker=".")
-    # plt.xlabel("KL divergence")
-    # plt.ylabel("I(" + t + "; " + s1 + " | " + s2 + ")")
-    # plt.title("UI(" + t + "; " + s1 + " \\ " + s2 + ")")
-# plt.show()
 
 # File for CMI
 with open('cmi.csv', 'w') as myfile:
